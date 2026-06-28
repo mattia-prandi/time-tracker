@@ -24,6 +24,9 @@ Forgot to clock in, or want to log a day after the fact? Use the manual entry fo
 **Copy summaries**
 Each day has a Copy button that builds a clean text block with the date, clock in, clock out, breaks, and total hours, ready to paste into another timesheet system. Each week has a Copy week summary button that does the same for every day in that week, plus the week total.
 
+**CSV export**
+Export CSV (top of the logged days section) downloads a CSV file with every entry ever logged: date, day, clock in, clock out, breaks, and total hours per day. Each week also has its own Export week CSV button, for just that week's days. Useful for opening in Excel, Numbers, or Google Sheets, or for archiving alongside a real timesheet system.
+
 ## How your data is stored
 
 All entries are saved locally on your device using browser storage (`localStorage`). There is no server, no account, and no syncing between devices. Nobody else can see your data, but it also does not back itself up anywhere.
