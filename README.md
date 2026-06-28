@@ -35,9 +35,66 @@ A few practical notes:
 - If you use this on multiple devices, each one keeps its own separate set of entries.
 - Use the copy summary buttons regularly to back up your hours into your real timesheet system.
 
+## Getting started from scratch
+
+This app is a single static file. It needs to live at a real web address before it can be opened and installed like an app. The free way to do that is GitHub Pages. Here is the full process, assuming you have never done this before.
+
+### 1. Get the file
+
+You need the project's HTML file. Make sure it is named exactly `index.html`. The name matters: GitHub Pages looks for a file with this exact name to serve as the homepage.
+
+### 2. Create a GitHub account (if you don't have one)
+
+Go to [github.com](https://github.com) and sign up. It's free.
+
+### 3. Create a repository
+
+1. Once logged in, tap the **+** icon (top right) and choose **New repository**.
+2. Give it a short name, for example `time-tracker`. Avoid spaces.
+3. Set it to **Public**.
+4. Tap **Create repository**.
+
+### 4. Add the file
+
+1. In the new repository, tap **Add file** > **Upload files** (or **Create new file** if you want to paste the content instead).
+2. Add the `index.html` file.
+3. Confirm with **Commit changes**.
+
+Double-check the file is named `index.html` once it appears in the repository's file list. A different name (like `time-tracker.html`) will not be picked up automatically.
+
+### 5. Turn on GitHub Pages
+
+1. In the repository, go to **Settings** (the tab at the top of the repository page itself, not the GitHub account settings).
+2. In the left menu, click **Pages**.
+3. Under "Build and deployment", set "Source" to **Deploy from a branch**.
+4. Under "Branch", select your default branch (commonly `main`) and the **/ (root)** folder.
+5. Click **Save**.
+
+### 6. Get the live URL
+
+Wait a minute or two, then reload the Settings > Pages screen. A box will show the live URL, in the form:
+
+```
+https://your-username.github.io/your-repo-name/
+```
+
+Use the exact URL shown there. It must match your GitHub username and repository name precisely, any typo (including missing or extra letters) will result in a 404 error.
+
+### 7. Open it and confirm it works
+
+Open that URL in Safari (on iPhone) or any browser, and confirm the app loads and the buttons respond.
+
+### If you get a 404 error
+
+This almost always means one of two things:
+- The URL you typed doesn't exactly match your GitHub username or repository name. Go back to Settings > Pages and copy the URL shown there instead of typing it from memory.
+- The file in the repository is not named `index.html`. Check the file list in the repository and rename it if needed.
+
 ## Using it on iPhone
 
-1. Open the app's URL in Safari.
+Once the app is live at its URL:
+
+1. Open the URL in Safari.
 2. Tap the Share icon.
 3. Tap Add to Home Screen.
 
