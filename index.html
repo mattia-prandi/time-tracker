@@ -202,6 +202,14 @@
 
   .week-header.overtime .week-total { color: var(--warn); }
 
+  .week-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .week-actions .btn { flex: 1; }
+
   .day-row {
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -402,7 +410,10 @@
   <div class="card">
     <div class="section-header">
       <h2>Logged days</h2>
-      <button id="btnAddManual" class="btn btn-outline btn-small">Add entry</button>
+      <div class="btn-grid" style="grid-template-columns: auto auto; gap: 8px;">
+        <button id="btnExportAll" class="btn btn-outline btn-small">Export CSV</button>
+        <button id="btnAddManual" class="btn btn-outline btn-small">Add entry</button>
+      </div>
     </div>
     <div id="weeksList"></div>
   </div>
@@ -683,11 +694,19 @@
 
       var copyWeekBtn = document.createElement("button");
       copyWeekBtn.className = "btn btn-outline btn-tiny";
-      copyWeekBtn.style.marginBottom = "8px";
-      copyWeekBtn.style.width = "100%";
       copyWeekBtn.textContent = "Copy week summary";
       copyWeekBtn.addEventListener("click", function () { copyWeekSummary(weekStart, entries, weekTotalHours); });
-      block.appendChild(copyWeekBtn);
+
+      var exportWeekBtn = document.createElement("button");
+      exportWeekBtn.className = "btn btn-outline btn-tiny";
+      exportWeekBtn.textContent = "Export week CSV";
+      exportWeekBtn.addEventListener("click", function () { exportWeekCSV(weekStart, entries); });
+
+      var weekActions = document.createElement("div");
+      weekActions.className = "week-actions";
+      weekActions.appendChild(copyWeekBtn);
+      weekActions.appendChild(exportWeekBtn);
+      block.appendChild(weekActions);
 
       entries.forEach(function (entry) {
         block.appendChild(renderDayRow(entry));
@@ -785,6 +804,63 @@
     try { document.execCommand("copy"); } catch (e) {}
     document.body.removeChild(ta);
     showToast(message);
+  }
+
+  // ---------- CSV export ----------
+
+  function csvEscape(value) {
+    var str = String(value);
+    if (/[",\n]/.test(str)) {
+      str = '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }
+
+  function entriesToCSV(entries) {
+    var header = ["Date", "Day", "Clock In", "Clock Out", "Breaks", "Total Hours"];
+    var rows = [header];
+
+    entries.forEach(function (e) {
+      var breaksStr = (e.breaks && e.breaks.length)
+        ? e.breaks.map(function (b) { return b.start + " to " + (b.end || "ongoing"); }).join("; ")
+        : "";
+      var totalMin = entryTotalMinutes(e);
+      var totalVal = totalMin === null ? "" : minutesToHours(totalMin).toFixed(2);
+      var dayName = DAY_NAMES[parseISODate(e.date).getDay()];
+      rows.push([e.date, dayName, e.clockIn || "", e.clockOut || "", breaksStr, totalVal]);
+    });
+
+    return rows.map(function (r) {
+      return r.map(csvEscape).join(",");
+    }).join("\n");
+  }
+
+  function downloadCSV(filename, csvContent) {
+    var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function exportAllCSV() {
+    if (state.entries.length === 0) {
+      showToast("No entries to export");
+      return;
+    }
+    var sorted = state.entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    downloadCSV("time-tracker-all.csv", entriesToCSV(sorted));
+    showToast("CSV exported");
+  }
+
+  function exportWeekCSV(weekStart, entries) {
+    var sorted = entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    downloadCSV("time-tracker-week-" + weekStart + ".csv", entriesToCSV(sorted));
+    showToast("Week CSV exported");
   }
 
   // ---------- Toast ----------
@@ -960,10 +1036,12 @@
   document.getElementById("btnEndBreak").addEventListener("click", endBreak);
 
   document.getElementById("btnManualToday").addEventListener("click", function () {
-    openModal(getEntryByDate(todayISO()));
+    var entry = getEntryByDate(todayISO());
+    openModal(entry || { date: todayISO(), clockIn: null, clockOut: null, breaks: [] });
   });
 
   document.getElementById("btnAddManual").addEventListener("click", function () { openModal(null); });
+  document.getElementById("btnExportAll").addEventListener("click", exportAllCSV);
   document.getElementById("modalClose").addEventListener("click", closeModal);
   document.getElementById("modalOverlay").addEventListener("click", function (ev) {
     if (ev.target.id === "modalOverlay") closeModal();
