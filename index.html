@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Time Tracker">
+<meta name="theme-color" content="#FAFAF8">
+<title>Time Tracker</title>
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --card: #FFFFFF;
+    --border: #E4E1D8;
+    --text: #1F2430;
+    --text-muted: #6B7280;
+    --accent: #2F6F6F;
+    --accent-dark: #234F4F;
+    --accent-soft: #E7F0EF;
+    --warn: #C2410C;
+    --warn-soft: #FCE9DD;
+    --danger: #B3261E;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .app {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .topbar h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .today-date {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .status-line {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent-dark);
+    margin-bottom: 10px;
+  }
+
+  .time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .time-cell {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+
+  .time-cell .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .time-cell .value {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .breaks-mini {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 16px 12px;
+    min-height: 56px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.05s;
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: var(--accent-soft); color: var(--accent-dark); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-danger { background: #FBEAE9; color: var(--danger); }
+  .btn-link {
+    background: transparent;
+    color: var(--accent-dark);
+    text-decoration: underline;
+    padding: 10px 0;
+    min-height: 0;
+    font-weight: 500;
+    font-size: 14px;
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .btn-small { padding: 10px 14px; min-height: 0; font-size: 14px; }
+  .btn-tiny { padding: 8px 10px; min-height: 0; font-size: 13px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-header h2 {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .week-block {
+    margin-bottom: 18px;
+  }
+
+  .week-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    margin-bottom: 8px;
+  }
+
+  .week-header.overtime {
+    background: var(--warn-soft);
+  }
+
+  .week-header .week-range {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .week-header .week-total {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .week-header.overtime .week-total { color: var(--warn); }
+
+  .day-row {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
+  .day-row .day-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+
+  .day-row .day-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .day-row .day-total {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .day-row .day-detail {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .day-row .day-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 20px 0;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .modal-overlay.hidden { display: none; }
+
+  .modal {
+    background: var(--card);
+    width: 100%;
+    max-width: 520px;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 18px max(18px, env(safe-area-inset-bottom));
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .modal-header h3 { margin: 0; font-size: 17px; }
+
+  .modal-close {
+    background: var(--accent-soft);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 18px;
+    color: var(--accent-dark);
+    cursor: pointer;
+  }
+
+  form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  form input[type="date"],
+  form input[type="time"] {
+    width: 100%;
+    margin-top: 4px;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .breaks-section { margin-bottom: 8px; }
+
+  .breaks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .break-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .break-row input {
+    padding: 10px;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .break-remove {
+    background: #FBEAE9;
+    color: var(--danger);
+    border: none;
+    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .modal-actions .btn { flex: 1; }
+
+  .toast {
+    position: fixed;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-dark);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    z-index: 200;
+    opacity: 1;
+    transition: opacity 0.3s;
+  }
+
+  .toast.hidden { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <h1>Time Tracker</h1>
+    <div class="today-date" id="todayDateLabel"></div>
+  </div>
+
+  <div class="card today-card">
+    <div class="status-line" id="statusLine">Not started</div>
+    <div class="time-grid" id="todayTimes"></div>
+    <div class="breaks-mini" id="todayBreaksMini"></div>
+    <div class="btn-grid">
+      <button id="btnClockIn" class="btn btn-primary">Clock In</button>
+      <button id="btnClockOut" class="btn btn-primary">Clock Out</button>
+      <button id="btnStartBreak" class="btn btn-secondary">Start Break</button>
+      <button id="btnEndBreak" class="btn btn-secondary">End Break</button>
+    </div>
+    <button id="btnManualToday" class="btn btn-link">Edit today manually</button>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <h2>Logged days</h2>
+      <button id="btnAddManual" class="btn btn-outline btn-small">Add entry</button>
+    </div>
+    <div id="weeksList"></div>
+  </div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Edit day</h3>
+      <button id="modalClose" class="modal-close" type="button">&times;</button>
+    </div>
+    <form id="entryForm">
+      <label>Date
+        <input type="date" id="formDate" required>
+      </label>
+      <div class="field-row">
+        <label>Clock in
+          <input type="time" id="formClockIn">
+        </label>
+        <label>Clock out
+          <input type="time" id="formClockOut">
+        </label>
+      </div>
+      <div class="breaks-section">
+        <div class="breaks-header">
+          <span>Breaks</span>
+          <button type="button" id="btnAddBreakRow" class="btn btn-outline btn-tiny">Add break</button>
+        </div>
+        <div id="breaksRows"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="btnDeleteEntry" class="btn btn-danger">Delete</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "timeTrackerData_v1";
+  var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  var state = loadData();
+  var breakRowCounter = 0;
+  var editingEntryId = null;
+
+  // ---------- Storage ----------
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { entries: [] };
+      var parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.entries)) return { entries: [] };
+      return parsed;
+    } catch (e) {
+      return { entries: [] };
+    }
+  }
+
+  function saveData() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  // ---------- Date and time helpers ----------
+
+  function pad(n) { return n < 10 ? "0" + n : String(n); }
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function nowHM() {
+    var d = new Date();
+    return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function parseISODate(iso) {
+    var parts = iso.split("-");
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  }
+
+  function formatDateLong(iso) {
+    var d = parseISODate(iso);
+    return DAY_NAMES[d.getDay()] + ", " + MONTH_NAMES[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+  }
+
+  function formatDateShort(iso) {
+    var d = parseISODate(iso);
+    return DAY_NAMES[d.getDay()] + ", " + MONTH_NAMES[d.getMonth()] + " " + d.getDate();
+  }
+
+  function timeToMinutes(hm) {
+    if (!hm) return null;
+    var parts = hm.split(":");
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  function minutesToHours(min) {
+    return Math.round((min / 60) * 100) / 100;
+  }
+
+  function getMondayISO(iso) {
+    var d = parseISODate(iso);
+    var dow = d.getDay(); // 0 = Sun ... 6 = Sat
+    var diff = dow === 0 ? -6 : 1 - dow;
+    d.setDate(d.getDate() + diff);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function addDaysISO(iso, days) {
+    var d = parseISODate(iso);
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  // ---------- Hours calculation ----------
+
+  function breakMinutes(brk) {
+    if (!brk.start || !brk.end) return 0;
+    var s = timeToMinutes(brk.start);
+    var e = timeToMinutes(brk.end);
+    if (e < s) e += 1440;
+    return e - s;
+  }
+
+  function entryTotalMinutes(entry) {
+    if (!entry.clockIn || !entry.clockOut) return null;
+    var s = timeToMinutes(entry.clockIn);
+    var e = timeToMinutes(entry.clockOut);
+    if (e < s) e += 1440;
+    var total = e - s;
+    (entry.breaks || []).forEach(function (b) {
+      total -= breakMinutes(b);
+    });
+    if (total < 0) total = 0;
+    return total;
+  }
+
+  function entryTotalHoursLabel(entry) {
+    var min = entryTotalMinutes(entry);
+    if (min === null) return "In progress";
+    return minutesToHours(min).toFixed(2) + "h";
+  }
+
+  // ---------- Data access ----------
+
+  function getEntryByDate(iso) {
+    return state.entries.find(function (e) { return e.date === iso; }) || null;
+  }
+
+  function getEntryById(id) {
+    return state.entries.find(function (e) { return e.id === id; }) || null;
+  }
+
+  function ensureTodayEntry() {
+    var iso = todayISO();
+    var entry = getEntryByDate(iso);
+    if (!entry) {
+      entry = { id: "e_" + Date.now(), date: iso, clockIn: null, clockOut: null, breaks: [] };
+      state.entries.push(entry);
+    }
+    return entry;
+  }
+
+  function hasOpenBreak(entry) {
+    var list = entry.breaks || [];
+    return list.length > 0 && !list[list.length - 1].end;
+  }
+
+  // ---------- Rendering: today card ----------
+
+  function renderToday() {
+    var iso = todayISO();
+    document.getElementById("todayDateLabel").textContent = formatDateLong(iso);
+
+    var entry = getEntryByDate(iso);
+    var statusEl = document.getElementById("statusLine");
+    var timesEl = document.getElementById("todayTimes");
+    var breaksMiniEl = document.getElementById("todayBreaksMini");
+
+    var btnIn = document.getElementById("btnClockIn");
+    var btnOut = document.getElementById("btnClockOut");
+    var btnStartBreak = document.getElementById("btnStartBreak");
+    var btnEndBreak = document.getElementById("btnEndBreak");
+
+    timesEl.innerHTML =
+      "<div class='time-cell'><div class='label'>Clock in</div><div class='value mono'>" + (entry && entry.clockIn ? entry.clockIn : "--:--") + "</div></div>" +
+      "<div class='time-cell'><div class='label'>Clock out</div><div class='value mono'>" + (entry && entry.clockOut ? entry.clockOut : "--:--") + "</div></div>";
+
+    if (entry && entry.breaks && entry.breaks.length) {
+      var parts = entry.breaks.map(function (b) {
+        return b.start + " to " + (b.end || "ongoing");
+      });
+      breaksMiniEl.textContent = "Breaks: " + parts.join(", ");
+    } else {
+      breaksMiniEl.textContent = "No breaks logged yet";
+    }
+
+    if (!entry || !entry.clockIn) {
+      statusEl.textContent = "Not started";
+      btnIn.disabled = false;
+      btnOut.disabled = true;
+      btnStartBreak.disabled = true;
+      btnEndBreak.disabled = true;
+    } else if (entry.clockOut) {
+      statusEl.textContent = "Day completed (" + entryTotalHoursLabel(entry) + ")";
+      btnIn.disabled = true;
+      btnOut.disabled = true;
+      btnStartBreak.disabled = true;
+      btnEndBreak.disabled = true;
+    } else if (hasOpenBreak(entry)) {
+      statusEl.textContent = "On break";
+      btnIn.disabled = true;
+      btnOut.disabled = false;
+      btnStartBreak.disabled = true;
+      btnEndBreak.disabled = false;
+    } else {
+      statusEl.textContent = "Working";
+      btnIn.disabled = true;
+      btnOut.disabled = false;
+      btnStartBreak.disabled = false;
+      btnEndBreak.disabled = true;
+    }
+  }
+
+  // ---------- Rendering: weeks list ----------
+
+  function renderWeeks() {
+    var container = document.getElementById("weeksList");
+    container.innerHTML = "";
+
+    if (state.entries.length === 0) {
+      container.innerHTML = "<div class='empty-state'>No days logged yet. Clock in above or add an entry manually.</div>";
+      return;
+    }
+
+    var groups = {};
+    state.entries.forEach(function (entry) {
+      var weekStart = getMondayISO(entry.date);
+      if (!groups[weekStart]) groups[weekStart] = [];
+      groups[weekStart].push(entry);
+    });
+
+    var weekStarts = Object.keys(groups).sort().reverse();
+
+    weekStarts.forEach(function (weekStart) {
+      var entries = groups[weekStart].slice().sort(function (a, b) {
+        return a.date < b.date ? 1 : -1;
+      });
+
+      var weekTotalMin = 0;
+      entries.forEach(function (e) {
+        var m = entryTotalMinutes(e);
+        if (m !== null) weekTotalMin += m;
+      });
+      var weekTotalHours = minutesToHours(weekTotalMin);
+      var isOvertime = weekTotalHours > 40;
+
+      var weekEnd = addDaysISO(weekStart, 6);
+      var block = document.createElement("div");
+      block.className = "week-block";
+
+      var header = document.createElement("div");
+      header.className = "week-header" + (isOvertime ? " overtime" : "");
+      header.innerHTML =
+        "<div class='week-range'>" + formatDateShort(weekStart) + " to " + formatDateShort(weekEnd) + "</div>" +
+        "<div class='week-total mono'>" + weekTotalHours.toFixed(2) + "h" + (isOvertime ? " · overtime" : "") + "</div>";
+
+      block.appendChild(header);
+
+      var copyWeekBtn = document.createElement("button");
+      copyWeekBtn.className = "btn btn-outline btn-tiny";
+      copyWeekBtn.style.marginBottom = "8px";
+      copyWeekBtn.style.width = "100%";
+      copyWeekBtn.textContent = "Copy week summary";
+      copyWeekBtn.addEventListener("click", function () { copyWeekSummary(weekStart, entries, weekTotalHours); });
+      block.appendChild(copyWeekBtn);
+
+      entries.forEach(function (entry) {
+        block.appendChild(renderDayRow(entry));
+      });
+
+      container.appendChild(block);
+    });
+  }
+
+  function renderDayRow(entry) {
+    var row = document.createElement("div");
+    row.className = "day-row";
+
+    var detailParts = [];
+    detailParts.push("In " + (entry.clockIn || "--:--"));
+    detailParts.push("Out " + (entry.clockOut || "--:--"));
+    if (entry.breaks && entry.breaks.length) {
+      detailParts.push(entry.breaks.length + " break" + (entry.breaks.length > 1 ? "s" : ""));
+    }
+
+    row.innerHTML =
+      "<div class='day-top'>" +
+        "<div class='day-name'>" + formatDateShort(entry.date) + "</div>" +
+        "<div class='day-total mono'>" + entryTotalHoursLabel(entry) + "</div>" +
+      "</div>" +
+      "<div class='day-detail mono'>" + detailParts.join(" · ") + "</div>" +
+      "<div class='day-actions'></div>";
+
+    var actions = row.querySelector(".day-actions");
+
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "btn btn-outline btn-tiny";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", function () { copyDaySummary(entry); });
+    actions.appendChild(copyBtn);
+
+    var editBtn = document.createElement("button");
+    editBtn.className = "btn btn-outline btn-tiny";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", function () { openModal(entry); });
+    actions.appendChild(editBtn);
+
+    return row;
+  }
+
+  // ---------- Copy summaries ----------
+
+  function dayLines(entry) {
+    var lines = [];
+    lines.push("Date: " + entry.date + " (" + DAY_NAMES[parseISODate(entry.date).getDay()] + ")");
+    lines.push("Clock in: " + (entry.clockIn || "not set"));
+    lines.push("Clock out: " + (entry.clockOut || "not set"));
+    if (entry.breaks && entry.breaks.length) {
+      entry.breaks.forEach(function (b, i) {
+        lines.push("Break " + (i + 1) + ": " + b.start + " to " + (b.end || "ongoing"));
+      });
+    } else {
+      lines.push("Breaks: none");
+    }
+    lines.push("Total: " + entryTotalHoursLabel(entry));
+    return lines;
+  }
+
+  function copyDaySummary(entry) {
+    var text = dayLines(entry).join("\n");
+    copyToClipboard(text, "Day summary copied");
+  }
+
+  function copyWeekSummary(weekStart, entries, weekTotalHours) {
+    var blocks = entries.map(function (e) { return dayLines(e).join("\n"); });
+    var text = blocks.join("\n\n") + "\n\nWeek total: " + weekTotalHours.toFixed(2) + "h";
+    copyToClipboard(text, "Week summary copied");
+  }
+
+  function copyToClipboard(text, message) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        showToast(message);
+      }).catch(function () {
+        fallbackCopy(text, message);
+      });
+    } else {
+      fallbackCopy(text, message);
+    }
+  }
+
+  function fallbackCopy(text, message) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    showToast(message);
+  }
+
+  // ---------- Toast ----------
+
+  var toastTimer = null;
+  function showToast(message) {
+    var toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.remove("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.add("hidden"); }, 2200);
+  }
+
+  // ---------- Today actions ----------
+
+  function clockIn() {
+    var entry = ensureTodayEntry();
+    if (entry.clockIn) return;
+    entry.clockIn = nowHM();
+    saveData();
+    renderAll();
+    showToast("Clocked in at " + entry.clockIn);
+  }
+
+  function clockOut() {
+    var entry = getEntryByDate(todayISO());
+    if (!entry || !entry.clockIn || entry.clockOut) return;
+    if (hasOpenBreak(entry)) {
+      entry.breaks[entry.breaks.length - 1].end = nowHM();
+    }
+    entry.clockOut = nowHM();
+    saveData();
+    renderAll();
+    showToast("Clocked out at " + entry.clockOut);
+  }
+
+  function startBreak() {
+    var entry = getEntryByDate(todayISO());
+    if (!entry || !entry.clockIn || entry.clockOut || hasOpenBreak(entry)) return;
+    entry.breaks = entry.breaks || [];
+    entry.breaks.push({ start: nowHM(), end: null });
+    saveData();
+    renderAll();
+    showToast("Break started");
+  }
+
+  function endBreak() {
+    var entry = getEntryByDate(todayISO());
+    if (!entry || !hasOpenBreak(entry)) return;
+    entry.breaks[entry.breaks.length - 1].end = nowHM();
+    saveData();
+    renderAll();
+    showToast("Break ended");
+  }
+
+  // ---------- Modal: manual entry form ----------
+
+  function openModal(entry) {
+    editingEntryId = entry ? entry.id : null;
+    document.getElementById("modalTitle").textContent = entry ? "Edit day" : "Add entry";
+    document.getElementById("formDate").value = entry ? entry.date : todayISO();
+    document.getElementById("formClockIn").value = entry && entry.clockIn ? entry.clockIn : "";
+    document.getElementById("formClockOut").value = entry && entry.clockOut ? entry.clockOut : "";
+
+    var rowsContainer = document.getElementById("breaksRows");
+    rowsContainer.innerHTML = "";
+    breakRowCounter = 0;
+    if (entry && entry.breaks && entry.breaks.length) {
+      entry.breaks.forEach(function (b) { addBreakRow(b.start, b.end); });
+    }
+
+    document.getElementById("btnDeleteEntry").style.display = entry ? "block" : "none";
+    document.getElementById("modalOverlay").classList.remove("hidden");
+  }
+
+  function closeModal() {
+    document.getElementById("modalOverlay").classList.add("hidden");
+    editingEntryId = null;
+  }
+
+  function addBreakRow(start, end) {
+    breakRowCounter += 1;
+    var rowId = "brk_" + breakRowCounter;
+    var row = document.createElement("div");
+    row.className = "break-row";
+    row.dataset.rowId = rowId;
+    row.innerHTML =
+      "<input type='time' class='brk-start' value='" + (start || "") + "'>" +
+      "<input type='time' class='brk-end' value='" + (end || "") + "'>" +
+      "<button type='button' class='break-remove'>&minus;</button>";
+    row.querySelector(".break-remove").addEventListener("click", function () {
+      row.remove();
+    });
+    document.getElementById("breaksRows").appendChild(row);
+  }
+
+  function collectBreaksFromForm() {
+    var rows = document.querySelectorAll("#breaksRows .break-row");
+    var breaks = [];
+    rows.forEach(function (row) {
+      var start = row.querySelector(".brk-start").value || null;
+      var end = row.querySelector(".brk-end").value || null;
+      if (start || end) breaks.push({ start: start, end: end });
+    });
+    return breaks;
+  }
+
+  function handleFormSubmit(ev) {
+    ev.preventDefault();
+    var date = document.getElementById("formDate").value;
+    if (!date) return;
+
+    var clockInVal = document.getElementById("formClockIn").value || null;
+    var clockOutVal = document.getElementById("formClockOut").value || null;
+    var breaks = collectBreaksFromForm();
+
+    var existing = getEntryByDate(date);
+    var targetId = editingEntryId;
+
+    if (existing && (!targetId || existing.id !== targetId)) {
+      // Another entry already exists for this date, merge into it
+      existing.clockIn = clockInVal;
+      existing.clockOut = clockOutVal;
+      existing.breaks = breaks;
+      if (targetId && targetId !== existing.id) {
+        state.entries = state.entries.filter(function (e) { return e.id !== targetId; });
+      }
+      showToast("Updated existing entry for this date");
+    } else if (targetId) {
+      var entry = getEntryById(targetId);
+      if (entry) {
+        entry.date = date;
+        entry.clockIn = clockInVal;
+        entry.clockOut = clockOutVal;
+        entry.breaks = breaks;
+      }
+      showToast("Entry saved");
+    } else {
+      state.entries.push({
+        id: "e_" + Date.now(),
+        date: date,
+        clockIn: clockInVal,
+        clockOut: clockOutVal,
+        breaks: breaks
+      });
+      showToast("Entry added");
+    }
+
+    saveData();
+    closeModal();
+    renderAll();
+  }
+
+  function handleDeleteEntry() {
+    if (!editingEntryId) return;
+    state.entries = state.entries.filter(function (e) { return e.id !== editingEntryId; });
+    saveData();
+    closeModal();
+    renderAll();
+    showToast("Entry deleted");
+  }
+
+  // ---------- Wire up ----------
+
+  function renderAll() {
+    renderToday();
+    renderWeeks();
+  }
+
+  document.getElementById("btnClockIn").addEventListener("click", clockIn);
+  document.getElementById("btnClockOut").addEventListener("click", clockOut);
+  document.getElementById("btnStartBreak").addEventListener("click", startBreak);
+  document.getElementById("btnEndBreak").addEventListener("click", endBreak);
+
+  document.getElementById("btnManualToday").addEventListener("click", function () {
+    openModal(getEntryByDate(todayISO()));
+  });
+
+  document.getElementById("btnAddManual").addEventListener("click", function () { openModal(null); });
+  document.getElementById("modalClose").addEventListener("click", closeModal);
+  document.getElementById("modalOverlay").addEventListener("click", function (ev) {
+    if (ev.target.id === "modalOverlay") closeModal();
+  });
+  document.getElementById("btnAddBreakRow").addEventListener("click", function () { addBreakRow("", ""); });
+  document.getElementById("entryForm").addEventListener("submit", handleFormSubmit);
+  document.getElementById("btnDeleteEntry").addEventListener("click", handleDeleteEntry);
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
