@@ -332,6 +332,16 @@
     margin-bottom: 8px;
   }
 
+  .time-preview {
+    display: block;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--accent-dark);
+    margin-top: 4px;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
   .break-row {
     display: grid;
     grid-template-columns: 1fr 1fr auto;
@@ -367,6 +377,19 @@
   }
 
   .modal-actions .btn { flex: 1; }
+
+  .note-textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    resize: vertical;
+    margin-bottom: 14px;
+  }
 
   .toast {
     position: fixed;
@@ -432,9 +455,11 @@
       <div class="field-row">
         <label>Clock in
           <input type="time" id="formClockIn">
+          <span class="time-preview mono" id="previewClockIn"></span>
         </label>
         <label>Clock out
           <input type="time" id="formClockOut">
+          <span class="time-preview mono" id="previewClockOut"></span>
         </label>
       </div>
       <div class="breaks-section">
@@ -444,6 +469,9 @@
         </div>
         <div id="breaksRows"></div>
       </div>
+      <label>Notes
+        <textarea id="formNote" class="note-textarea" rows="3" placeholder="Optional, what did you work on"></textarea>
+      </label>
       <div class="modal-actions">
         <button type="button" id="btnDeleteEntry" class="btn btn-danger">Delete</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -453,6 +481,20 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
+
+<div id="noteModalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>What did you work on?</h3>
+      <button id="noteModalClose" class="modal-close" type="button">&times;</button>
+    </div>
+    <textarea id="noteInput" class="note-textarea" rows="4" placeholder="Optional, e.g. Calibrated the force sensor on the right arm"></textarea>
+    <div class="modal-actions">
+      <button type="button" id="btnSkipNote" class="btn btn-outline">Skip</button>
+      <button type="button" id="btnSaveNote" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -488,6 +530,12 @@
 
   function pad(n) { return n < 10 ? "0" + n : String(n); }
 
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   function todayISO() {
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
@@ -517,6 +565,17 @@
     if (!hm) return null;
     var parts = hm.split(":");
     return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  function formatTime12(hm) {
+    if (!hm) return "";
+    var parts = hm.split(":");
+    var h = parseInt(parts[0], 10);
+    var m = parts[1];
+    var period = h >= 12 ? "PM" : "AM";
+    var h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return h12 + ":" + m + " " + period;
   }
 
   function minutesToHours(min) {
@@ -733,6 +792,7 @@
         "<div class='day-total mono'>" + entryTotalHoursLabel(entry) + "</div>" +
       "</div>" +
       "<div class='day-detail mono'>" + detailParts.join(" · ") + "</div>" +
+      (entry.note ? "<div class='day-detail'>" + escapeHtml(entry.note) + "</div>" : "") +
       "<div class='day-actions'></div>";
 
     var actions = row.querySelector(".day-actions");
@@ -767,6 +827,9 @@
       lines.push("Breaks: none");
     }
     lines.push("Total: " + entryTotalHoursLabel(entry));
+    if (entry.note) {
+      lines.push("Notes: " + entry.note);
+    }
     return lines;
   }
 
@@ -817,7 +880,7 @@
   }
 
   function entriesToCSV(entries) {
-    var header = ["Date", "Day", "Clock In", "Clock Out", "Breaks", "Total Hours"];
+    var header = ["Date", "Day", "Clock In", "Clock Out", "Breaks", "Total Hours", "Notes"];
     var rows = [header];
 
     entries.forEach(function (e) {
@@ -827,7 +890,7 @@
       var totalMin = entryTotalMinutes(e);
       var totalVal = totalMin === null ? "" : minutesToHours(totalMin).toFixed(2);
       var dayName = DAY_NAMES[parseISODate(e.date).getDay()];
-      rows.push([e.date, dayName, e.clockIn || "", e.clockOut || "", breaksStr, totalVal]);
+      rows.push([e.date, dayName, e.clockIn || "", e.clockOut || "", breaksStr, totalVal, e.note || ""]);
     });
 
     return rows.map(function (r) {
@@ -885,16 +948,34 @@
     showToast("Clocked in at " + entry.clockIn);
   }
 
-  function clockOut() {
+  var pendingClockOutTime = null;
+
+  function handleClockOutClick() {
     var entry = getEntryByDate(todayISO());
     if (!entry || !entry.clockIn || entry.clockOut) return;
+    pendingClockOutTime = nowHM();
+    document.getElementById("noteInput").value = "";
+    document.getElementById("noteModalOverlay").classList.remove("hidden");
+  }
+
+  function finalizeClockOut(note) {
+    var entry = getEntryByDate(todayISO());
+    if (!entry || pendingClockOutTime === null) return;
     if (hasOpenBreak(entry)) {
-      entry.breaks[entry.breaks.length - 1].end = nowHM();
+      entry.breaks[entry.breaks.length - 1].end = pendingClockOutTime;
     }
-    entry.clockOut = nowHM();
+    entry.clockOut = pendingClockOutTime;
+    entry.note = note || "";
+    var clockedOutAt = pendingClockOutTime;
+    pendingClockOutTime = null;
     saveData();
+    closeNoteModal();
     renderAll();
-    showToast("Clocked out at " + entry.clockOut);
+    showToast("Clocked out at " + clockedOutAt);
+  }
+
+  function closeNoteModal() {
+    document.getElementById("noteModalOverlay").classList.add("hidden");
   }
 
   function startBreak() {
@@ -924,6 +1005,9 @@
     document.getElementById("formDate").value = entry ? entry.date : todayISO();
     document.getElementById("formClockIn").value = entry && entry.clockIn ? entry.clockIn : "";
     document.getElementById("formClockOut").value = entry && entry.clockOut ? entry.clockOut : "";
+    document.getElementById("previewClockIn").textContent = formatTime12(document.getElementById("formClockIn").value);
+    document.getElementById("previewClockOut").textContent = formatTime12(document.getElementById("formClockOut").value);
+    document.getElementById("formNote").value = entry && entry.note ? entry.note : "";
 
     var rowsContainer = document.getElementById("breaksRows");
     rowsContainer.innerHTML = "";
@@ -948,9 +1032,17 @@
     row.className = "break-row";
     row.dataset.rowId = rowId;
     row.innerHTML =
-      "<input type='time' class='brk-start' value='" + (start || "") + "'>" +
-      "<input type='time' class='brk-end' value='" + (end || "") + "'>" +
+      "<div><input type='time' class='brk-start' value='" + (start || "") + "'><span class='time-preview mono brk-start-preview'></span></div>" +
+      "<div><input type='time' class='brk-end' value='" + (end || "") + "'><span class='time-preview mono brk-end-preview'></span></div>" +
       "<button type='button' class='break-remove'>&minus;</button>";
+    var startInput = row.querySelector(".brk-start");
+    var endInput = row.querySelector(".brk-end");
+    var startPreview = row.querySelector(".brk-start-preview");
+    var endPreview = row.querySelector(".brk-end-preview");
+    startInput.addEventListener("input", function () { startPreview.textContent = formatTime12(startInput.value); });
+    endInput.addEventListener("input", function () { endPreview.textContent = formatTime12(endInput.value); });
+    startPreview.textContent = formatTime12(startInput.value);
+    endPreview.textContent = formatTime12(endInput.value);
     row.querySelector(".break-remove").addEventListener("click", function () {
       row.remove();
     });
@@ -975,20 +1067,23 @@
 
     var clockInVal = document.getElementById("formClockIn").value || null;
     var clockOutVal = document.getElementById("formClockOut").value || null;
+    var noteVal = document.getElementById("formNote").value.trim();
     var breaks = collectBreaksFromForm();
 
     var existing = getEntryByDate(date);
     var targetId = editingEntryId;
 
+    var savedMessage;
     if (existing && (!targetId || existing.id !== targetId)) {
       // Another entry already exists for this date, merge into it
       existing.clockIn = clockInVal;
       existing.clockOut = clockOutVal;
       existing.breaks = breaks;
+      existing.note = noteVal;
       if (targetId && targetId !== existing.id) {
         state.entries = state.entries.filter(function (e) { return e.id !== targetId; });
       }
-      showToast("Updated existing entry for this date");
+      savedMessage = "Updated existing entry for this date";
     } else if (targetId) {
       var entry = getEntryById(targetId);
       if (entry) {
@@ -996,22 +1091,29 @@
         entry.clockIn = clockInVal;
         entry.clockOut = clockOutVal;
         entry.breaks = breaks;
+        entry.note = noteVal;
       }
-      showToast("Entry saved");
+      savedMessage = "Entry saved";
     } else {
       state.entries.push({
         id: "e_" + Date.now(),
         date: date,
         clockIn: clockInVal,
         clockOut: clockOutVal,
-        breaks: breaks
+        breaks: breaks,
+        note: noteVal
       });
-      showToast("Entry added");
+      savedMessage = "Entry added";
+    }
+
+    if (clockInVal && clockOutVal && clockInVal === clockOutVal) {
+      savedMessage = "Saved, but clock in and clock out are the same time, check AM/PM";
     }
 
     saveData();
     closeModal();
     renderAll();
+    showToast(savedMessage);
   }
 
   function handleDeleteEntry() {
@@ -1031,15 +1133,36 @@
   }
 
   document.getElementById("btnClockIn").addEventListener("click", clockIn);
-  document.getElementById("btnClockOut").addEventListener("click", clockOut);
+  document.getElementById("btnClockOut").addEventListener("click", handleClockOutClick);
   document.getElementById("btnStartBreak").addEventListener("click", startBreak);
   document.getElementById("btnEndBreak").addEventListener("click", endBreak);
+
+  document.getElementById("btnSaveNote").addEventListener("click", function () {
+    finalizeClockOut(document.getElementById("noteInput").value.trim());
+  });
+  document.getElementById("btnSkipNote").addEventListener("click", function () {
+    finalizeClockOut("");
+  });
+  document.getElementById("noteModalClose").addEventListener("click", function () {
+    finalizeClockOut(document.getElementById("noteInput").value.trim());
+  });
+  document.getElementById("noteModalOverlay").addEventListener("click", function (ev) {
+    if (ev.target.id === "noteModalOverlay") {
+      finalizeClockOut(document.getElementById("noteInput").value.trim());
+    }
+  });
 
   document.getElementById("btnManualToday").addEventListener("click", function () {
     var entry = getEntryByDate(todayISO());
     openModal(entry || { date: todayISO(), clockIn: null, clockOut: null, breaks: [] });
   });
 
+  document.getElementById("formClockIn").addEventListener("input", function (ev) {
+    document.getElementById("previewClockIn").textContent = formatTime12(ev.target.value);
+  });
+  document.getElementById("formClockOut").addEventListener("input", function (ev) {
+    document.getElementById("previewClockOut").textContent = formatTime12(ev.target.value);
+  });
   document.getElementById("btnAddManual").addEventListener("click", function () { openModal(null); });
   document.getElementById("btnExportAll").addEventListener("click", exportAllCSV);
   document.getElementById("modalClose").addEventListener("click", closeModal);
