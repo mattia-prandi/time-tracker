@@ -202,6 +202,23 @@
 
   .week-header.overtime .week-total { color: var(--warn); }
 
+  .week-ot-line {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--warn);
+    padding: 0 10px;
+    margin: -2px 0 8px;
+  }
+
+  .day-ot {
+    color: var(--warn);
+    font-weight: 600;
+  }
+
+  .day-total-ot {
+    color: var(--warn);
+  }
+
   .week-actions {
     display: flex;
     gap: 8px;
@@ -625,6 +642,75 @@
     return minutesToHours(min).toFixed(2) + "h";
   }
 
+  // ---------- Overtime calculation (California rules) ----------
+  // 1.5x: hours over 8 in a day, straight-time hours over 40 in a workweek,
+  //       or the first 8 hours on the 7th consecutive day worked in a workweek.
+  // 2x:   hours over 12 in a day, or hours over 8 on the 7th consecutive day.
+  // Workweek = Monday to Sunday, same grouping as the weeks list.
+
+  function computeOvertime(allEntries) {
+    var result = {}; // entry.id -> { regMin, ot15Min, ot2Min }
+    var weeks = {};
+
+    allEntries.forEach(function (entry) {
+      var m = entryTotalMinutes(entry);
+      if (m === null) return;
+      var ws = getMondayISO(entry.date);
+      if (!weeks[ws]) weeks[ws] = [];
+      weeks[ws].push({ entry: entry, minutes: m });
+    });
+
+    Object.keys(weeks).forEach(function (ws) {
+      var days = weeks[ws].slice().sort(function (a, b) {
+        return a.entry.date < b.entry.date ? -1 : 1;
+      });
+
+      var workedDates = {};
+      days.forEach(function (d) {
+        if (d.minutes > 0) workedDates[d.entry.date] = true;
+      });
+      var allSevenWorked = true;
+      for (var i = 0; i < 7; i++) {
+        if (!workedDates[addDaysISO(ws, i)]) { allSevenWorked = false; break; }
+      }
+      var seventhDayISO = addDaysISO(ws, 6);
+
+      var cumRegMin = 0;
+      days.forEach(function (d) {
+        var min = d.minutes;
+        var regMin, ot15Min, ot2Min;
+
+        if (allSevenWorked && d.entry.date === seventhDayISO) {
+          regMin = 0;
+          ot15Min = Math.min(min, 480);
+          ot2Min = Math.max(min - 480, 0);
+        } else {
+          regMin = Math.min(min, 480);
+          ot15Min = Math.min(Math.max(min - 480, 0), 240);
+          ot2Min = Math.max(min - 720, 0);
+        }
+
+        // Weekly rule: straight-time beyond 40h in the workweek becomes 1.5x
+        var regAllowed = Math.max(0, 2400 - cumRegMin);
+        if (regMin > regAllowed) {
+          ot15Min += regMin - regAllowed;
+          regMin = regAllowed;
+        }
+        cumRegMin += regMin;
+
+        result[d.entry.id] = { regMin: regMin, ot15Min: ot15Min, ot2Min: ot2Min };
+      });
+    });
+
+    return result;
+  }
+
+  function overtimeBreakdownLabel(ot) {
+    return "Reg " + minutesToHours(ot.regMin).toFixed(2) +
+      " · 1.5x " + minutesToHours(ot.ot15Min).toFixed(2) +
+      " · 2x " + minutesToHours(ot.ot2Min).toFixed(2);
+  }
+
   // ---------- Data access ----------
 
   function getEntryByDate(iso) {
@@ -725,6 +811,7 @@
     });
 
     var weekStarts = Object.keys(groups).sort().reverse();
+    var overtime = computeOvertime(state.entries);
 
     weekStarts.forEach(function (weekStart) {
       var entries = groups[weekStart].slice().sort(function (a, b) {
@@ -732,12 +819,19 @@
       });
 
       var weekTotalMin = 0;
+      var weekOt = { regMin: 0, ot15Min: 0, ot2Min: 0 };
       entries.forEach(function (e) {
         var m = entryTotalMinutes(e);
         if (m !== null) weekTotalMin += m;
+        var ot = overtime[e.id];
+        if (ot) {
+          weekOt.regMin += ot.regMin;
+          weekOt.ot15Min += ot.ot15Min;
+          weekOt.ot2Min += ot.ot2Min;
+        }
       });
       var weekTotalHours = minutesToHours(weekTotalMin);
-      var isOvertime = weekTotalHours > 40;
+      var isOvertime = weekOt.ot15Min > 0 || weekOt.ot2Min > 0;
 
       var weekEnd = addDaysISO(weekStart, 6);
       var block = document.createElement("div");
@@ -747,9 +841,16 @@
       header.className = "week-header" + (isOvertime ? " overtime" : "");
       header.innerHTML =
         "<div class='week-range'>" + formatDateShort(weekStart) + " to " + formatDateShort(weekEnd) + "</div>" +
-        "<div class='week-total mono'>" + weekTotalHours.toFixed(2) + "h" + (isOvertime ? " · overtime" : "") + "</div>";
+        "<div class='week-total mono'>" + weekTotalHours.toFixed(2) + "h</div>";
 
       block.appendChild(header);
+
+      if (isOvertime) {
+        var otLine = document.createElement("div");
+        otLine.className = "week-ot-line mono";
+        otLine.textContent = overtimeBreakdownLabel(weekOt);
+        block.appendChild(otLine);
+      }
 
       var copyWeekBtn = document.createElement("button");
       copyWeekBtn.className = "btn btn-outline btn-tiny";
@@ -768,14 +869,14 @@
       block.appendChild(weekActions);
 
       entries.forEach(function (entry) {
-        block.appendChild(renderDayRow(entry));
+        block.appendChild(renderDayRow(entry, overtime[entry.id]));
       });
 
       container.appendChild(block);
     });
   }
 
-  function renderDayRow(entry) {
+  function renderDayRow(entry, ot) {
     var row = document.createElement("div");
     row.className = "day-row";
 
@@ -786,12 +887,18 @@
       detailParts.push(entry.breaks.length + " break" + (entry.breaks.length > 1 ? "s" : ""));
     }
 
+    var hasOt = ot && (ot.ot15Min > 0 || ot.ot2Min > 0);
+    var otLine = hasOt
+      ? "<div class='day-detail day-ot mono'>" + overtimeBreakdownLabel(ot) + "</div>"
+      : "";
+
     row.innerHTML =
       "<div class='day-top'>" +
         "<div class='day-name'>" + formatDateShort(entry.date) + "</div>" +
-        "<div class='day-total mono'>" + entryTotalHoursLabel(entry) + "</div>" +
+        "<div class='day-total mono" + (hasOt ? " day-total-ot" : "") + "'>" + entryTotalHoursLabel(entry) + "</div>" +
       "</div>" +
       "<div class='day-detail mono'>" + detailParts.join(" · ") + "</div>" +
+      otLine +
       (entry.note ? "<div class='day-detail'>" + escapeHtml(entry.note) + "</div>" : "") +
       "<div class='day-actions'></div>";
 
@@ -814,7 +921,7 @@
 
   // ---------- Copy summaries ----------
 
-  function dayLines(entry) {
+  function dayLines(entry, overtime) {
     var lines = [];
     lines.push("Date: " + entry.date + " (" + DAY_NAMES[parseISODate(entry.date).getDay()] + ")");
     lines.push("Clock in: " + (entry.clockIn || "not set"));
@@ -827,6 +934,10 @@
       lines.push("Breaks: none");
     }
     lines.push("Total: " + entryTotalHoursLabel(entry));
+    var ot = overtime && overtime[entry.id];
+    if (ot) {
+      lines.push("Breakdown: " + overtimeBreakdownLabel(ot));
+    }
     if (entry.note) {
       lines.push("Notes: " + entry.note);
     }
@@ -834,13 +945,26 @@
   }
 
   function copyDaySummary(entry) {
-    var text = dayLines(entry).join("\n");
+    var overtime = computeOvertime(state.entries);
+    var text = dayLines(entry, overtime).join("\n");
     copyToClipboard(text, "Day summary copied");
   }
 
   function copyWeekSummary(weekStart, entries, weekTotalHours) {
-    var blocks = entries.map(function (e) { return dayLines(e).join("\n"); });
-    var text = blocks.join("\n\n") + "\n\nWeek total: " + weekTotalHours.toFixed(2) + "h";
+    var overtime = computeOvertime(state.entries);
+    var blocks = entries.map(function (e) { return dayLines(e, overtime).join("\n"); });
+    var weekOt = { regMin: 0, ot15Min: 0, ot2Min: 0 };
+    entries.forEach(function (e) {
+      var ot = overtime[e.id];
+      if (ot) {
+        weekOt.regMin += ot.regMin;
+        weekOt.ot15Min += ot.ot15Min;
+        weekOt.ot2Min += ot.ot2Min;
+      }
+    });
+    var text = blocks.join("\n\n") +
+      "\n\nWeek total: " + weekTotalHours.toFixed(2) + "h" +
+      "\nWeek breakdown: " + overtimeBreakdownLabel(weekOt);
     copyToClipboard(text, "Week summary copied");
   }
 
@@ -880,8 +1004,9 @@
   }
 
   function entriesToCSV(entries) {
-    var header = ["Date", "Day", "Clock In", "Clock Out", "Breaks", "Total Hours", "Notes"];
+    var header = ["Date", "Day", "Clock In", "Clock Out", "Breaks", "Total Hours", "Regular Hours", "OT 1.5x Hours", "OT 2x Hours", "Notes"];
     var rows = [header];
+    var overtime = computeOvertime(state.entries);
 
     entries.forEach(function (e) {
       var breaksStr = (e.breaks && e.breaks.length)
@@ -889,8 +1014,12 @@
         : "";
       var totalMin = entryTotalMinutes(e);
       var totalVal = totalMin === null ? "" : minutesToHours(totalMin).toFixed(2);
+      var ot = overtime[e.id];
+      var regVal = ot ? minutesToHours(ot.regMin).toFixed(2) : "";
+      var ot15Val = ot ? minutesToHours(ot.ot15Min).toFixed(2) : "";
+      var ot2Val = ot ? minutesToHours(ot.ot2Min).toFixed(2) : "";
       var dayName = DAY_NAMES[parseISODate(e.date).getDay()];
-      rows.push([e.date, dayName, e.clockIn || "", e.clockOut || "", breaksStr, totalVal, e.note || ""]);
+      rows.push([e.date, dayName, e.clockIn || "", e.clockOut || "", breaksStr, totalVal, regVal, ot15Val, ot2Val, e.note || ""]);
     });
 
     return rows.map(function (r) {

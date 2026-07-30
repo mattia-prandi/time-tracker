@@ -16,16 +16,24 @@ Tap Start Break and End Break as many times as you need during the day. Each bre
 For every day, the app calculates hours worked as: clock out time minus clock in time, minus the total break time.
 
 **Weekly view**
-Days are grouped into weeks (Monday to Sunday), each with a running total. If a week goes over 40 hours, it is marked as overtime so you notice it right away.
+Days are grouped into weeks (Monday to Sunday), each with a running total. Any week containing overtime is highlighted, with a breakdown of regular, 1.5x, and 2x hours.
+
+**California overtime tracking**
+Every day is automatically split into regular, 1.5x, and 2x hours following California overtime rules:
+
+- 1.5x: hours over 8 in a day, straight-time hours over 40 in a workweek, or the first 8 hours on the 7th consecutive day worked in a workweek.
+- 2x: hours over 12 in a day, or hours over 8 on the 7th consecutive day worked in a workweek.
+
+The workweek is Monday to Sunday. Daily overtime hours do not count again toward the weekly 40-hour threshold (no double counting), and the 7th-day rule only kicks in when all seven days of the workweek have logged hours. Days with overtime show a "Reg / 1.5x / 2x" breakdown, and the same breakdown appears in the week header, copy summaries, and CSV exports.
 
 **Manual entry and editing**
 Forgot to clock in, or want to log a day after the fact? Use the manual entry form to set or fix the date, clock in time, clock out time, and any breaks for a given day. Existing entries can be edited or deleted the same way.
 
 **Copy summaries**
-Each day has a Copy button that builds a clean text block with the date, clock in, clock out, breaks, and total hours, ready to paste into another timesheet system. Each week has a Copy week summary button that does the same for every day in that week, plus the week total.
+Each day has a Copy button that builds a clean text block with the date, clock in, clock out, breaks, total hours, and the regular/1.5x/2x breakdown, ready to paste into another timesheet system. Each week has a Copy week summary button that does the same for every day in that week, plus the week total and week breakdown.
 
 **CSV export**
-Export CSV (top of the logged days section) downloads a CSV file with every entry ever logged: date, day, clock in, clock out, breaks, and total hours per day. Each week also has its own Export week CSV button, for just that week's days. Useful for opening in Excel, Numbers, or Google Sheets, or for archiving alongside a real timesheet system.
+Export CSV (top of the logged days section) downloads a CSV file with every entry ever logged: date, day, clock in, clock out, breaks, total hours, and regular/1.5x/2x overtime hours per day. Each week also has its own Export week CSV button, for just that week's days. Useful for opening in Excel, Numbers, or Google Sheets, or for archiving alongside a real timesheet system.
 
 ## How your data is stored
 
